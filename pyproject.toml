@@ -1,0 +1,5 @@
+[project]
+name = "indice-legal"
+version = "0.1.0"
+requires-python = ">=3.12,<3.14"
+dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.32,<1", "httpx>=0.27,<1", "pymupdf>=1.25,<2", "openpyxl>=3.1,<4", "python-docx>=1.1,<2", "python-multipart>=0.0.20", "python-dotenv>=1,<2", "pillow>=11"]
