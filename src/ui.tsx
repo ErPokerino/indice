@@ -138,11 +138,16 @@ export function ConfirmModal({
   );
 }
 
-export function Brand() {
+export function Brand({ dark = false }: { dark?: boolean }) {
   return (
-    <span className="brand">
-      <img src="/indice.svg" alt="" />
-      <span>indice</span>
+    <span className={"brand " + (dark ? "brand-dark" : "")}>
+      <span className="brand-mark">
+        <img src="/indice.svg" alt="" />
+      </span>
+      <span className="brand-copy">
+        <span className="brand-name">indice</span>
+        <small className="brand-sub">LEGAL WORKSPACE</small>
+      </span>
     </span>
   );
 }

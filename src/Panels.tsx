@@ -3,7 +3,6 @@ import {
   ArrowUpRight,
   Check,
   ChevronRight,
-  Cpu,
   Eye,
   EyeOff,
   FileCheck2,
@@ -72,6 +71,16 @@ const CATEGORIES = [
   "Compliance",
   "Generale",
 ];
+
+function categorySlug(cat: string) {
+  const c = (cat || "Generale").toLowerCase();
+  if (c.includes("corrisp")) return "cat-blue";
+  if (c.includes("contratt")) return "cat-emerald";
+  if (c.includes("contenz")) return "cat-crimson";
+  if (c.includes("parer")) return "cat-indigo";
+  if (c.includes("compl")) return "cat-amber";
+  return "cat-slate";
+}
 
 export function Settings({
   studio,
@@ -171,10 +180,10 @@ export function Settings({
       </div>
       {tab === "Assistente" && (
         <>
-          <div className="subtle-box key-box">
+          <div className="hero-key-box">
             <div className="key-head">
               <strong>
-                <KeyRound size={15} />
+                <KeyRound size={16} />
                 Chiave API Gemini
               </strong>
               <span className={"status-dot " + (studio.online ? "on" : "")}>
@@ -276,6 +285,7 @@ export function Settings({
               <span>{l}</span>
               <input
                 type="checkbox"
+                className="switch"
                 checked={v.tools.includes(k)}
                 onChange={(e) =>
                   patch({
@@ -291,6 +301,7 @@ export function Settings({
             <span>Ricerca semantica</span>
             <input
               type="checkbox"
+              className="switch"
               checked={v.semantic}
               onChange={(e) => patch({ semantic: e.target.checked })}
             />
@@ -310,7 +321,7 @@ export function Settings({
             celle Excel + concetto semantico) e attiva le skill legali pertinenti.
           </p>
           <h3>Tools di retrieval ed esecuzione</h3>
-          <div className="blueprint-list">
+          <div className="blueprint-list two-col">
             {studio.agentBlueprint?.tools.map((tool) => (
               <div className="blueprint-card" key={tool.id}>
                 <div className="blueprint-top">
@@ -322,7 +333,7 @@ export function Settings({
             ))}
           </div>
           <h3>Skills modulari attive</h3>
-          <div className="blueprint-list">
+          <div className="blueprint-list two-col">
             {studio.agentBlueprint?.skills.map((skill) => (
               <div className="blueprint-card" key={skill.id}>
                 <div className="blueprint-top">
@@ -338,11 +349,13 @@ export function Settings({
         </div>
       )}
       {tab === "Integrazioni" && (
-        <div className="integration-list">
+        <div className="integration-grid">
           {previews.map(([name, desc]) => (
-            <section key={name}>
-              <small>Roadmap / Anteprima</small>
-              <strong>{name}</strong>
+            <section className="blueprint-card" key={name}>
+              <div className="blueprint-top">
+                <strong>{name}</strong>
+                <small>Anteprima</small>
+              </div>
               <p>{desc}</p>
             </section>
           ))}
@@ -891,51 +904,61 @@ export function DocumentModels({
                 </button>
               ))}
             </div>
-            {visibleTemplates.map((t) => (
-              <section className="template-card" key={t.id}>
-                <div className="list-heading">
-                  <FileCheck2 size={18} />
-                  <strong>{t.name}</strong>
-                  <span className="cat-badge">{t.category || "Generale"}</span>
-                  <small>v{t.version}</small>
-                </div>
-                <p>{t.purpose}</p>
-                <div className="model-meta-row">
-                  {t.tone && <span>Tono: {t.tone}</span>}
-                  {t.audience && <span>Destinatario: {t.audience}</span>}
-                  {(t.examples?.length || 0) > 0 && (
-                    <span>{t.examples!.length} esempi allegati</span>
-                  )}
-                </div>
-                <div className="actions">
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    aria-label={"Elimina modello " + t.name}
-                    onClick={() => setConfirmDelete(t)}
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    className="outline"
-                    onClick={() => {
-                      set({ ...t });
-                      setExMode("none");
-                    }}
-                  >
-                    Modifica e esempi
-                  </button>
-                  <button
-                    type="button"
-                    className="primary"
-                    onClick={() => useTemplate(t)}
-                  >
-                    Usa in chat <ArrowUpRight size={15} />
-                  </button>
-                </div>
-              </section>
-            ))}
+            <div className="template-grid">
+              {visibleTemplates.map((t) => (
+                <section
+                  className={"template-card " + categorySlug(t.category)}
+                  key={t.id}
+                >
+                  <div className="list-heading">
+                    <FileCheck2 size={17} />
+                    <strong>{t.name}</strong>
+                    <span className="cat-badge">{t.category || "Generale"}</span>
+                    <small>v{t.version}</small>
+                  </div>
+                  <p>{t.purpose}</p>
+                  <div className="model-meta-row">
+                    {t.tone && <span>{t.tone}</span>}
+                    {t.audience && <span>{t.audience}</span>}
+                    {(t.examples?.length || 0) > 0 && (
+                      <span className="ex-count-tag">
+                        {t.examples!.length}{" "}
+                        {t.examples!.length === 1
+                          ? "esempio allegato"
+                          : "esempi allegati"}
+                      </span>
+                    )}
+                  </div>
+                  <div className="actions">
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      aria-label={"Elimina modello " + t.name}
+                      onClick={() => setConfirmDelete(t)}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      className="outline"
+                      onClick={() => {
+                        set({ ...t });
+                        setExMode("none");
+                      }}
+                    >
+                      Modifica e esempi
+                    </button>
+                    <button
+                      type="button"
+                      className="primary"
+                      onClick={() => useTemplate(t)}
+                    >
+                      Usa in chat <ArrowUpRight size={15} />
+                    </button>
+                  </div>
+                </section>
+              ))}
+            </div>
             {!visibleTemplates.length && (
               <p className="muted">Nessun modello corrisponde al filtro.</p>
             )}
@@ -1122,7 +1145,7 @@ export function FoldersPanel({
                 <FolderSearch size={17} />
                 <div>
                   <strong>{f.label}</strong>
-                  <small className="folder-path">{f.path}</small>
+                  <small className="folder-path mono-path">{f.path}</small>
                 </div>
               </div>
               <span
@@ -1147,6 +1170,7 @@ export function FoldersPanel({
               <label className="inline-check">
                 <input
                   type="checkbox"
+                  className="switch"
                   checked={f.enabled}
                   disabled={busy}
                   onChange={() => void toggleEnabled(f)}
@@ -1291,6 +1315,7 @@ export function FoldersPanel({
             <span>Includi sottocartelle</span>
             <input
               type="checkbox"
+              className="switch"
               checked={recursive}
               onChange={(e) => setRecursive(e.target.checked)}
             />

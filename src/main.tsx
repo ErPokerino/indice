@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import {
   ArrowUp,
   AudioLines,
+  BarChart3,
   BookOpen,
   Check,
   ChevronRight,
@@ -15,15 +16,19 @@ import {
   FolderOpen,
   FolderPlus,
   FolderSearch,
+  Image as ImageIcon,
   Menu,
   MessageSquare,
   PanelRight,
+  PanelRightClose,
   Plus,
   RefreshCw,
+  Scale,
   Search,
   Settings as Gear,
   SlidersHorizontal,
   SquarePen,
+  Table2,
   Trash2,
   X,
 } from "lucide-react";
@@ -74,6 +79,18 @@ const OUTPUT_MODES = {
   document: "Documento",
 };
 
+function fileExtBadge(name: string) {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  if (ext === "pdf") return { label: "PDF", cls: "ext-pdf", icon: FileText };
+  if (ext === "xlsx" || ext === "csv")
+    return { label: ext.toUpperCase(), cls: "ext-xls", icon: FileSpreadsheet };
+  if (ext === "docx" || ext === "doc")
+    return { label: "DOCX", cls: "ext-doc", icon: FileText };
+  if (ext === "png" || ext === "jpg" || ext === "jpeg")
+    return { label: ext.toUpperCase(), cls: "ext-img", icon: ImageIcon };
+  return { label: ext.toUpperCase() || "TXT", cls: "ext-txt", icon: FileText };
+}
+
 function App() {
   const [studio, setStudio] = useState<Studio | null>(null),
     [s, setSession] = useState<Session | null>(null),
@@ -84,11 +101,15 @@ function App() {
     [keepTpl, setKeepTpl] = useState(true),
     [showFields, setShowFields] = useState(false),
     [fieldValues, setFieldValues] = useState<Record<string, string>>({}),
-    [outputMode, setOutputMode] = useState<"auto" | "table" | "chart" | "document">("auto"),
+    [outputMode, setOutputMode] = useState<
+      "auto" | "table" | "chart" | "document"
+    >("auto"),
     [file, setFile] = useState<number | null>(null),
     [source, setSource] = useState<Source | null>(null);
   const [tab, setTab] = useState<"selected" | "all" | "folders">("selected"),
     [docFilter, setDocFilter] = useState(""),
+    [inspectorOpen, setInspectorOpen] = useState(true),
+    [inspectorWidth, setInspectorWidth] = useState(400),
     [meter, setMeter] = useState<Meter | null>(null),
     [meterError, setMeterError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -180,6 +201,19 @@ function App() {
   }, []);
 
   useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        if (studio?.settings.tools.includes("search") && s) {
+          setPanel((prev) => (prev === "search" ? null : "search"));
+        }
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [studio?.settings.tools, s?.id]);
+
+  useEffect(() => {
     const el = draft.current;
     if (!el) return;
     el.style.height = "auto";
@@ -230,6 +264,22 @@ function App() {
   useEffect(() => {
     nonce.current = "";
   }, [s?.revision, text, scope, tpl?.id, outputMode]);
+
+  function startResize(e: React.PointerEvent<HTMLDivElement>) {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = inspectorWidth;
+    function move(ev: PointerEvent) {
+      const next = Math.min(620, Math.max(310, startW + (startX - ev.clientX)));
+      setInspectorWidth(next);
+    }
+    function up() {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
 
   if (!studio) {
     return (
@@ -293,11 +343,19 @@ function App() {
           </button>
         </form>
         <div className="empty-links">
-          <button type="button" className="outline" onClick={() => setPanel("settings")}>
+          <button
+            type="button"
+            className="outline"
+            onClick={() => setPanel("settings")}
+          >
             <Gear size={15} />
             Configurazione e chiave API
           </button>
-          <button type="button" className="outline" onClick={() => setPanel("models")}>
+          <button
+            type="button"
+            className="outline"
+            onClick={() => setPanel("models")}
+          >
             <FileStack size={15} />
             Modelli di documenti
           </button>
@@ -358,9 +416,12 @@ function App() {
     setSource({ ...x });
     setFile(x.doc);
     setTab(session.selected.includes(x.doc) ? "selected" : "all");
-    setPanel(
-      window.matchMedia("(max-width: 1050px)").matches ? "sources" : null,
-    );
+    if (window.matchMedia("(max-width: 1050px)").matches) {
+      setPanel("sources");
+    } else {
+      setInspectorOpen(true);
+      setPanel(null);
+    }
   }
 
   function chooseDoc(d: Doc) {
@@ -423,7 +484,10 @@ function App() {
       );
       setDeleteSessionTarget(null);
       await refresh();
-      if (deleteSessionTarget.id === session.id || !st.sessions.some((x) => x.id === session.id)) {
+      if (
+        deleteSessionTarget.id === session.id ||
+        !st.sessions.some((x) => x.id === session.id)
+      ) {
         await load(r.nextSession);
       }
     } catch (e) {
@@ -534,14 +598,16 @@ function App() {
       setTpl(targetTpl);
       setKeepTpl(true);
     }
-    setText((prev) => prev || "Aggiorna la bozza del documento con queste indicazioni: ");
+    setText(
+      (prev) => prev || "Aggiorna la bozza del documento con queste indicazioni: ",
+    );
     draft.current?.focus();
   }
 
   const nav = (
     <>
       <div className="brand-row">
-        <Brand />
+        <Brand dark />
       </div>
       <button
         type="button"
@@ -552,25 +618,48 @@ function App() {
         <SquarePen size={16} />
         Nuova conversazione
       </button>
+
+      <div className="nav-section-label">Studio</div>
       <nav className="navigation" aria-label="Studio">
-        <button type="button" disabled={block} onClick={() => setPanel("practices")}>
+        <button
+          type="button"
+          disabled={block}
+          onClick={() => setPanel("practices")}
+        >
           <FolderOpen />
           Pratiche
+          <span className="nav-count" aria-hidden="true">
+            {st.matters.length}
+          </span>
         </button>
-        <button type="button" disabled={block} onClick={() => setPanel("models")}>
+        <button
+          type="button"
+          disabled={block}
+          onClick={() => setPanel("models")}
+        >
           <FileStack />
           Modelli di documenti
+          <span className="nav-count" aria-hidden="true">
+            {st.templates.length}
+          </span>
         </button>
-        <button type="button" disabled={block} onClick={() => setPanel("folders")}>
+        <button
+          type="button"
+          disabled={block}
+          onClick={() => setPanel("folders")}
+        >
           <FolderSearch />
           Cartelle retrieval
           {folders.length > 0 && (
-            <span className="nav-count">{activeFoldersCount}</span>
+            <span className="nav-count active-count" aria-hidden="true">
+              {activeFoldersCount}
+            </span>
           )}
         </button>
       </nav>
+
       <section className="active-matter">
-        <small>Pratica aperta</small>
+        <div className="nav-section-label">Pratica aperta</div>
         <button
           type="button"
           className="matter-name"
@@ -586,7 +675,9 @@ function App() {
             .map((i) => (
               <div
                 key={i.id}
-                className={"session-row " + (i.id === session.id ? "active" : "")}
+                className={
+                  "session-row " + (i.id === session.id ? "active" : "")
+                }
               >
                 <button
                   type="button"
@@ -611,19 +702,28 @@ function App() {
             ))}
         </div>
       </section>
+
       <div className="nav-bottom">
-        <button type="button" disabled={block} onClick={() => setPanel("settings")}>
-          <Gear size={17} />
+        <button
+          type="button"
+          disabled={block}
+          onClick={() => setPanel("settings")}
+        >
+          <Gear size={16} />
           Configurazione
         </button>
         <button
           type="button"
-          className="connection connection-btn"
+          className={"connection connection-btn " + (st.online ? "online" : "offline")}
           onClick={() => setPanel("settings")}
           title="Gestisci chiave API Gemini"
         >
           <i className={st.online ? "connected" : ""} />
-          {st.online ? "Gemini configurato" : "Modalità locale · Imposta chiave"}
+          <span>
+            {st.online
+              ? "Gemini attivo"
+              : "Modalità locale · Imposta API key"}
+          </span>
         </button>
       </div>
     </>
@@ -632,7 +732,12 @@ function App() {
   const inspector = (
     <>
       <div className="inspector-heading">
-        <h2>Fonti della sessione</h2>
+        <div>
+          <h2>Scrivania fonti</h2>
+          <small className="inspector-sub">
+            {session.selected.length} nel contesto · {session.docs.length} nel fascicolo
+          </small>
+        </div>
         <div className="inline-actions">
           <IconButton
             label="Cartelle di retrieval"
@@ -650,6 +755,7 @@ function App() {
           </IconButton>
         </div>
       </div>
+
       <div className="source-tabs">
         <button
           type="button"
@@ -684,18 +790,25 @@ function App() {
               <div className="mini-folder-top">
                 <FolderSearch size={14} />
                 <strong>{f.label}</strong>
-                <span className={"status-pill " + (f.enabled ? "risk-low" : "risk-mid")}>
+                <span
+                  className={
+                    "status-pill " + (f.enabled ? "risk-low" : "risk-mid")
+                  }
+                >
                   {f.enabled ? "Attiva" : "Pausa"}
                 </span>
               </div>
-              <small className="folder-path">{f.path}</small>
+              <small className="folder-path mono-path">{f.path}</small>
               <div className="mini-folder-foot">
                 <span>{f.fileCount} file</span>
                 <button
                   type="button"
                   className="text-btn"
                   onClick={() =>
-                    void api(`/matters/${session.matter}/folders/${f.id}/sync`, "POST")
+                    void api(
+                      `/matters/${session.matter}/folders/${f.id}/sync`,
+                      "POST",
+                    )
                       .then(reloadCurrentSession)
                       .catch(report)
                   }
@@ -726,68 +839,75 @@ function App() {
             />
           )}
           <div className="file-list">
-            {docs.map((d) => (
-              <div
-                className={
-                  "file-row " +
-                  (file === d.id ? "picked " : "") +
-                  (d.folderEnabled === false ? "folder-paused" : "")
-                }
-                key={d.id}
-              >
-                <button
-                  type="button"
-                  onClick={() => chooseDoc(d)}
-                  title={"Leggi " + (d.relPath || d.name)}
+            {docs.map((d) => {
+              const badge = fileExtBadge(d.name);
+              const Icon = badge.icon;
+              return (
+                <div
+                  className={
+                    "file-row " +
+                    (file === d.id ? "picked " : "") +
+                    (d.folderEnabled === false ? "folder-paused" : "")
+                  }
+                  key={d.id}
                 >
-                  {/xlsx|csv/.test(d.name.toLowerCase()) ? (
-                    <FileSpreadsheet />
-                  ) : (
-                    <FileText />
-                  )}
-                  <div className="file-name-wrap">
-                    <span>{d.name}</span>
-                    {d.folderLabel && (
-                      <small className="file-folder-tag">{d.folderLabel}</small>
-                    )}
-                  </div>
-                </button>
-                {!d.folderId && (
                   <button
                     type="button"
-                    className="icon-btn file-del"
-                    aria-label={"Elimina documento " + d.name}
-                    title="Elimina documento"
-                    disabled={block}
-                    onClick={() => setDeleteDocTarget(d)}
+                    onClick={() => chooseDoc(d)}
+                    title={"Leggi " + (d.relPath || d.name)}
                   >
-                    <Trash2 size={12} />
+                    <span className={"file-ext-badge " + badge.cls}>
+                      <Icon size={12} />
+                      {badge.label}
+                    </span>
+                    <div className="file-name-wrap">
+                      <span>{d.name}</span>
+                      <small className="file-folder-tag">
+                        {d.folderLabel
+                          ? d.folderLabel
+                          : d.pages > 1
+                            ? `${d.pages} pagine`
+                            : "Documento"}
+                      </small>
+                    </div>
                   </button>
-                )}
-                <button
-                  type="button"
-                  className={
-                    "file-check " +
-                    (session.selected.includes(d.id) ? "checked" : "")
-                  }
-                  role="checkbox"
-                  aria-checked={session.selected.includes(d.id)}
-                  aria-label={
-                    (session.selected.includes(d.id)
-                      ? "Rimuovi dal contesto "
-                      : "Aggiungi al contesto ") + d.name
-                  }
-                  disabled={block}
-                  onClick={() => void toggleDoc(d.id).catch(report)}
-                >
-                  {session.selected.includes(d.id) ? (
-                    <Check size={12} />
-                  ) : (
-                    <Plus size={12} />
+                  {!d.folderId && (
+                    <button
+                      type="button"
+                      className="icon-btn file-del"
+                      aria-label={"Elimina documento " + d.name}
+                      title="Elimina documento"
+                      disabled={block}
+                      onClick={() => setDeleteDocTarget(d)}
+                    >
+                      <Trash2 size={12} />
+                    </button>
                   )}
-                </button>
-              </div>
-            ))}
+                  <button
+                    type="button"
+                    className={
+                      "file-check " +
+                      (session.selected.includes(d.id) ? "checked" : "")
+                    }
+                    role="checkbox"
+                    aria-checked={session.selected.includes(d.id)}
+                    aria-label={
+                      (session.selected.includes(d.id)
+                        ? "Rimuovi dal contesto "
+                        : "Aggiungi al contesto ") + d.name
+                    }
+                    disabled={block}
+                    onClick={() => void toggleDoc(d.id).catch(report)}
+                  >
+                    {session.selected.includes(d.id) ? (
+                      <Check size={12} />
+                    ) : (
+                      <Plus size={12} />
+                    )}
+                  </button>
+                </div>
+              );
+            })}
             {!docs.length && (
               <p className="muted compact">
                 {tab === "all"
@@ -800,7 +920,9 @@ function App() {
                     session.docs.length ? setTab("all") : setPanel("upload")
                   }
                 >
-                  {session.docs.length ? "Scegli dal fascicolo" : "Carica un file"}
+                  {session.docs.length
+                    ? "Scegli dal fascicolo"
+                    : "Carica un file"}
                 </button>
               </p>
             )}
@@ -815,9 +937,11 @@ function App() {
               <BookOpen size={14} />
               {doc.name}
             </span>
-            {source && <small>Fonte citata</small>}
+            {source && <small className="cited-pill">Fonte citata</small>}
           </div>
-          <Reader key={doc.id} doc={doc} source={source} />
+          <div className="reader-stage">
+            <Reader key={doc.id} doc={doc} source={source} />
+          </div>
         </div>
       )}
       <div className="inspector-bottom">
@@ -826,7 +950,7 @@ function App() {
           disabled={!st.settings.tools.includes("search") || block}
           onClick={() => setPanel("search")}
         >
-          <Search size={17} />
+          <Search size={16} />
           Cerca nel fascicolo
           <ChevronRight size={15} />
         </button>
@@ -834,48 +958,97 @@ function App() {
     </>
   );
 
+  const gridStyle = inspectorOpen
+    ? ({ "--inspector-w": inspectorWidth + "px" } as React.CSSProperties)
+    : undefined;
+
   return (
-    <div className="workspace">
+    <div
+      className={
+        "workspace " + (inspectorOpen ? "" : "inspector-collapsed")
+      }
+      style={gridStyle}
+    >
       <a className="skip" href="#messaggio">
         Vai al messaggio
       </a>
       <aside className="sidebar">{nav}</aside>
       <main className="chat-pane">
         <header className="chat-header">
-          <div className="crumb">
-            <button
-              type="button"
-              className="mobile-nav icon-btn"
-              aria-label="Apri navigazione"
-              onClick={() => setPanel("nav")}
-            >
-              <Menu />
-            </button>
-            <button
-              type="button"
-              onClick={() => setPanel("practices")}
-              disabled={block}
-            >
-              Pratiche
-            </button>
-            <ChevronRight size={13} />
-            <span>{matter.name}</span>
-            <button
-              type="button"
-              className="mobile-sources"
-              onClick={() => setPanel("sources")}
-            >
-              <PanelRight size={16} />
-              Fonti
-            </button>
+          <div className="header-top-row">
+            <div className="crumb">
+              <button
+                type="button"
+                className="mobile-nav icon-btn"
+                aria-label="Apri navigazione"
+                onClick={() => setPanel("nav")}
+              >
+                <Menu />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPanel("practices")}
+                disabled={block}
+              >
+                Pratiche
+              </button>
+              <ChevronRight size={13} />
+              <span className="crumb-matter">{matter.name}</span>
+            </div>
+            <div className="header-kpis">
+              <button
+                type="button"
+                className="kpi-pill desktop-only"
+                onClick={() => setPanel("folders")}
+                title="Gestisci cartelle di retrieval"
+              >
+                <FolderSearch size={13} />
+                {activeFoldersCount} cartelle
+              </button>
+              <button
+                type="button"
+                className="kpi-pill desktop-only"
+                disabled={!st.settings.tools.includes("search") || block}
+                onClick={() => setPanel("search")}
+                title="Cerca nel fascicolo (Ctrl+K)"
+              >
+                <Search size={13} />
+                Cerca <kbd>Ctrl+K</kbd>
+              </button>
+              <button
+                type="button"
+                className="kpi-pill desktop-only"
+                onClick={() => setInspectorOpen(!inspectorOpen)}
+                aria-label={
+                  inspectorOpen ? "Nascondi fonti" : "Mostra fonti"
+                }
+              >
+                {inspectorOpen ? (
+                  <PanelRightClose size={14} />
+                ) : (
+                  <PanelRight size={14} />
+                )}
+                Fonti ({session.selected.length})
+              </button>
+              <button
+                type="button"
+                className="mobile-sources"
+                onClick={() => setPanel("sources")}
+              >
+                <PanelRight size={16} />
+                Fonti
+              </button>
+            </div>
           </div>
           <h1>{session.title}</h1>
         </header>
+
         <div className="transcript" ref={rail} aria-label="Conversazione">
           {session.turns.map((t) => (
             <Conversation
               key={t.id}
               turn={t}
+              activeSourceId={source?.id}
               onSource={openSource}
               details={() => details(t)}
               onRefineDocument={handleRefineDocument}
@@ -883,60 +1056,95 @@ function App() {
           ))}
           {!session.turns.length && (
             <div className="empty-chat">
-              <span className="empty-symbol">
-                <MessageSquare size={24} />
-              </span>
-              <h2>Da dove iniziamo?</h2>
-              <p>
-                {session.selected.length
-                  ? "Fai una domanda sui documenti, richiedi una tabella comparativa, un grafico o compila un modello di documento."
-                  : "Seleziona i documenti della pratica, collega una cartella o carica un file."}
-              </p>
-              <div className="starter-chips">
-                {session.docs.some((d) => d.name === "Contratto.pdf") && (
-                  <>
-                    <button
-                      type="button"
-                      className="outline"
-                      onClick={() => {
-                        setText(
-                          "Qual è il termine di preavviso previsto dal contratto?",
-                        );
-                        draft.current?.focus();
-                      }}
-                    >
-                      Qual è il termine di preavviso?
-                    </button>
-                    <button
-                      type="button"
-                      className="outline"
-                      onClick={() => {
-                        setScope(true);
-                        setOutputMode("table");
-                        setText(
-                          "Cerca nel fascicolo e crea una tabella comparativa tra Contratto, Addendum e Listino.",
-                        );
-                        draft.current?.focus();
-                      }}
-                    >
-                      Confronto tabellare del fascicolo
-                    </button>
-                    <button
-                      type="button"
-                      className="outline"
-                      onClick={() => {
-                        setScope(true);
-                        setOutputMode("chart");
-                        setText(
-                          "Cerca nel fascicolo il preavviso e mostra un grafico comparativo dei giorni.",
-                        );
-                        draft.current?.focus();
-                      }}
-                    >
-                      Grafico comparativo preavviso
-                    </button>
-                  </>
-                )}
+              <div className="launchpad-hero">
+                <span className="empty-symbol">
+                  <Scale size={24} />
+                </span>
+                <div>
+                  <h2>Pratica: {matter.name}</h2>
+                  <p>
+                    {session.docs.length} documenti nel fascicolo ·{" "}
+                    {st.templates.length} modelli legali pronti ·{" "}
+                    {activeFoldersCount} cartelle collegate
+                  </p>
+                </div>
+              </div>
+              <div className="launchpad-grid">
+                <button
+                  type="button"
+                  className="launchpad-card"
+                  onClick={() => {
+                    setText(
+                      "Qual è il termine di preavviso previsto dal contratto?",
+                    );
+                    draft.current?.focus();
+                  }}
+                >
+                  <span className="lp-icon lp-blue">
+                    <Search size={16} />
+                  </span>
+                  <strong>Verifica clausole e termini</strong>
+                  <small>
+                    Interroga i documenti selezionati con citazioni puntuali su
+                    pagina e paragrafo.
+                  </small>
+                </button>
+                <button
+                  type="button"
+                  className="launchpad-card"
+                  onClick={() => {
+                    setScope(true);
+                    setOutputMode("table");
+                    setText(
+                      "Cerca nel fascicolo e crea una tabella comparativa tra Contratto, Addendum e Listino.",
+                    );
+                    draft.current?.focus();
+                  }}
+                >
+                  <span className="lp-icon lp-emerald">
+                    <Table2 size={16} />
+                  </span>
+                  <strong>Matrice tabellare fascicolo</strong>
+                  <small>
+                    Confronta più documenti in una griglia ordinabile ed
+                    esportabile in CSV.
+                  </small>
+                </button>
+                <button
+                  type="button"
+                  className="launchpad-card"
+                  onClick={() => {
+                    setScope(true);
+                    setOutputMode("chart");
+                    setText(
+                      "Cerca nel fascicolo il preavviso e mostra un grafico comparativo dei giorni.",
+                    );
+                    draft.current?.focus();
+                  }}
+                >
+                  <span className="lp-icon lp-amber">
+                    <BarChart3 size={16} />
+                  </span>
+                  <strong>Grafici e timeline scadenze</strong>
+                  <small>
+                    Estrae valori numerici, penali e decorrenze temporali in
+                    grafici SVG.
+                  </small>
+                </button>
+                <button
+                  type="button"
+                  className="launchpad-card"
+                  onClick={() => setPanel("models")}
+                >
+                  <span className="lp-icon lp-indigo">
+                    <FileCheck2 size={16} />
+                  </span>
+                  <strong>Redigi atto da modello</strong>
+                  <small>
+                    Scegli Diffida, Parere, NDA o Nota al cliente e compila in
+                    chat con export DOCX.
+                  </small>
+                </button>
               </div>
             </div>
           )}
@@ -945,10 +1153,11 @@ function App() {
               <span />
               {st.online
                 ? "L'orchestratore sta consultando le fonti…"
-                : "Ricerca e sintesi locale…"}
+                : "Ricerca multi-strategia e sintesi locale…"}
             </div>
           )}
         </div>
+
         <div className="compose-area">
           {error && (
             <div className="error-box" role="alert">
@@ -966,7 +1175,10 @@ function App() {
                   <FileCheck2 size={14} />
                   Modello: <strong>{tpl.name}</strong>
                   {(tpl.examples?.length || 0) > 0 && (
-                    <small>({tpl.examples!.length} esempi)</small>
+                    <small>
+                      ({tpl.examples!.length}{" "}
+                      {tpl.examples!.length === 1 ? "esempio" : "esempi"})
+                    </small>
                   )}
                 </span>
                 <div className="active-doc-controls">
@@ -1012,7 +1224,10 @@ function App() {
                         placeholder="Compila qui o scrivi in chat…"
                         value={fieldValues[f] || ""}
                         onChange={(e) =>
-                          setFieldValues((prev) => ({ ...prev, [f]: e.target.value }))
+                          setFieldValues((prev) => ({
+                            ...prev,
+                            [f]: e.target.value,
+                          }))
                         }
                       />
                     </label>
@@ -1051,7 +1266,7 @@ function App() {
               placeholder={
                 tpl
                   ? `Fornisci indicazioni per compilare "${tpl.name}" (es. Destinatario: ..., Oggetto: ...)…`
-                  : "Scrivi nella pratica…"
+                  : "Fai una domanda sui documenti, chiedi una tabella, un grafico o un confronto…"
               }
               value={text}
               disabled={block}
@@ -1122,6 +1337,7 @@ function App() {
               </button>
             </div>
           </form>
+
           <div className="composer-footer">
             <div className="footer-left">
               <button
@@ -1130,15 +1346,11 @@ function App() {
                 title="Dettaglio del contesto"
                 onClick={() => setPanel("context")}
               >
-                <span
-                  className="ring"
-                  style={{
-                    background:
-                      "conic-gradient(var(--blue) " +
-                      Math.min(100, pct) +
-                      "%, #d9e1f1 0)",
-                  }}
-                />
+                <span className="ctx-bar" aria-hidden="true">
+                  <span
+                    style={{ width: Math.min(100, Math.max(2, pct)) + "%" }}
+                  />
+                </span>
                 Contesto {meterError ? "indisponibile" : percent}
                 {meter?.estimated && <small>stima</small>}
               </button>
@@ -1164,7 +1376,19 @@ function App() {
           </div>
         </div>
       </main>
-      <aside className="inspector">{inspector}</aside>
+
+      {inspectorOpen && (
+        <>
+          <div
+            className="resizer"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Ridimensiona pannello fonti"
+            onPointerDown={startResize}
+          />
+          <aside className="inspector">{inspector}</aside>
+        </>
+      )}
 
       {panel === "nav" && (
         <Modal title="Studio" onClose={() => setPanel(null)}>
@@ -1305,9 +1529,8 @@ function App() {
                     {detail.plan.map((p, idx) => (
                       <li key={idx}>
                         <strong>{p.strategy}</strong>
-                        {p.docFilter ? ` [${p.docFilter}]` : ""}: &laquo;{p.query}&raquo;
-                        {" → "}
-                        {p.hits} risultati ({p.reason})
+                        {p.docFilter ? ` [${p.docFilter}]` : ""}: &laquo;
+                        {p.query}&raquo; → {p.hits} risultati ({p.reason})
                       </li>
                     ))}
                   </ul>
